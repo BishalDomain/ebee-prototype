@@ -1,0 +1,4 @@
+node_modules/
+.gitdata/
+.DS_Store
+Thumbs.db
