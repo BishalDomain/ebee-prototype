@@ -1,4 +1,12 @@
-import { titleCase } from "./utils.js";
+import {
+  estimateRidePricing,
+  formatCurrency,
+  getCartCategory,
+  getCartCategoryLabel,
+  getDraftProgress,
+  getQuantityStep,
+  titleCase,
+} from "./utils.js";
 
 const assistantAvatarMarkup = `<img src="./mascot.png" alt="Zippy, eBee mascot">`;
 
@@ -6,18 +14,60 @@ export const el = {
   chatLog: document.getElementById("chat-log"),
   chatForm: document.getElementById("chat-form"),
   userInput: document.getElementById("user-input"),
+  imageInput: document.getElementById("menu-image-input"),
+  uploadTrigger: document.getElementById("upload-trigger"),
+  voiceTrigger: document.getElementById("voice-trigger"),
   suggestions: document.getElementById("suggestions"),
-  assistantStatus: document.getElementById("assistant-status"),
-  summaryDomain: document.getElementById("summary-domain"),
-  summaryFlow: document.getElementById("summary-flow"),
-  summaryItems: document.getElementById("summary-items"),
-  tabActive: document.getElementById("tab-active"),
-  tabHistory: document.getElementById("tab-history"),
-  secondaryMicrocopy: document.getElementById("secondary-microcopy"),
-  secondaryTitle: document.getElementById("secondary-title"),
-  checkoutPanel: document.getElementById("checkout-panel"),
+  historyList: document.getElementById("history-list"),
+  flowDetails: document.getElementById("flow-details"),
+  flowStatusLabel: document.getElementById("flow-status-label"),
+  flowStatusCopy: document.getElementById("flow-status-copy"),
+  historyViewBtn: document.getElementById("history-view-btn"),
+  flowViewBtn: document.getElementById("flow-view-btn"),
+  historyPanel: document.getElementById("history-panel"),
+  flowPanel: document.getElementById("flow-panel"),
+  menuToggle: document.getElementById("menu-toggle"),
+  cartToggle: document.getElementById("cart-toggle"),
+  closeMenu: document.getElementById("close-menu"),
+  closeCart: document.getElementById("close-cart"),
+  menuDrawer: document.getElementById("menu-drawer"),
+  cartDrawer: document.getElementById("cart-drawer"),
+  drawerOverlay: document.getElementById("drawer-overlay"),
+  cartGroups: document.getElementById("cart-groups"),
+  cartSubtotal: document.getElementById("cart-subtotal"),
+  cartFees: document.getElementById("cart-fees"),
+  cartTotal: document.getElementById("cart-total"),
+  cartFooterCopy: document.getElementById("cart-footer-copy"),
+  cartBadge: document.getElementById("cart-badge"),
+  progressFill: document.getElementById("order-progress-fill"),
   resetButton: document.getElementById("reset-session"),
 };
+
+export function setDrawerOpen(drawerName = "") {
+  const next = drawerName === "menu" || drawerName === "cart" ? drawerName : "";
+
+  document.body.classList.toggle("menu-open", next === "menu");
+  document.body.classList.toggle("cart-open", next === "cart");
+  document.body.classList.toggle("drawer-open", Boolean(next));
+
+  el.menuDrawer?.setAttribute("aria-hidden", String(next !== "menu"));
+  el.cartDrawer?.setAttribute("aria-hidden", String(next !== "cart"));
+  el.drawerOverlay?.setAttribute("aria-hidden", String(!next));
+  el.menuToggle?.setAttribute("aria-expanded", String(next === "menu"));
+  el.cartToggle?.setAttribute("aria-expanded", String(next === "cart"));
+}
+
+export function setMenuView(view) {
+  const next = view === "flow" ? "flow" : "history";
+  el.historyViewBtn?.classList.toggle("active", next === "history");
+  el.flowViewBtn?.classList.toggle("active", next === "flow");
+  el.historyViewBtn?.setAttribute("aria-selected", String(next === "history"));
+  el.flowViewBtn?.setAttribute("aria-selected", String(next === "flow"));
+  if (el.historyPanel) el.historyPanel.hidden = next !== "history";
+  if (el.flowPanel) el.flowPanel.hidden = next !== "flow";
+  el.historyPanel?.classList.toggle("active", next === "history");
+  el.flowPanel?.classList.toggle("active", next === "flow");
+}
 
 export function appendMessage(role, payload) {
   const wrap = document.createElement("article");
@@ -28,16 +78,11 @@ export function appendMessage(role, payload) {
   if (role === "assistant") {
     avatar.innerHTML = assistantAvatarMarkup;
   } else {
-    avatar.textContent = "You";
+    avatar.innerHTML = `<span aria-hidden="true"></span>`;
   }
 
   const bubble = document.createElement("div");
   bubble.className = `message ${role}`;
-
-  const meta = document.createElement("p");
-  meta.className = "message-meta";
-  meta.textContent = role === "assistant" ? "eBee" : "You";
-  bubble.appendChild(meta);
 
   const body = document.createElement("p");
   body.textContent = payload.text;
@@ -67,13 +112,28 @@ export function appendMessage(role, payload) {
     bubble.appendChild(grid);
   }
 
+  if (role === "assistant" && payload.actions?.length) {
+    const actionRow = document.createElement("div");
+    actionRow.className = "message-actions";
+
+    payload.actions.forEach((action) => {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = `message-action ${action.tone === "primary" ? "primary" : "secondary"}`;
+      button.textContent = action.label;
+      button.dataset.payload = action.payload;
+      actionRow.appendChild(button);
+    });
+
+    bubble.appendChild(actionRow);
+  }
+
   wrap.appendChild(avatar);
   wrap.appendChild(bubble);
   el.chatLog.appendChild(wrap);
   el.chatLog.scrollTop = el.chatLog.scrollHeight;
 }
 
-// Suggestions stay optional; the assistant still works fully through typed chat.
 export function renderSuggestions(actions, onAction) {
   el.suggestions.innerHTML = "";
   actions.forEach((action) => {
@@ -81,7 +141,10 @@ export function renderSuggestions(actions, onAction) {
     button.type = "button";
     button.className = "suggestion-chip";
     button.textContent = action.label;
-    button.addEventListener("click", () => onAction(action.payload));
+    button.addEventListener("click", () => {
+      setDrawerOpen("");
+      onAction(action.payload);
+    });
     el.suggestions.appendChild(button);
   });
 }
@@ -94,7 +157,6 @@ export function showTyping() {
   wrap.innerHTML = `
     <div class="avatar assistant">${assistantAvatarMarkup}</div>
     <div class="message assistant">
-      <p class="message-meta">eBee</p>
       <div class="typing"><span></span><span></span><span></span></div>
     </div>
   `;
@@ -103,12 +165,11 @@ export function showTyping() {
 }
 
 export function removeTyping() {
-  const node = document.getElementById("typing-indicator");
-  if (node) node.remove();
+  document.getElementById("typing-indicator")?.remove();
 }
 
 export function setAssistantPresence(label) {
-  el.assistantStatus.textContent = label;
+  document.body.dataset.assistantPresence = label.toLowerCase();
 }
 
 export function clearConversation() {
@@ -116,258 +177,271 @@ export function clearConversation() {
 }
 
 export function renderSummary(state) {
-  const isHistory = state.summaryView === "history";
-  const isRide = state.activeDomain === "ride";
-  const cartDomains = [...new Set(state.cart.map((item) => item.domain).filter(Boolean))];
-  const hasMixedCart = cartDomains.length > 1;
-
-  el.summaryDomain.textContent = isHistory
-    ? "Order history"
-    : state.activeDomain === "general"
-      ? "Nothing started yet"
-      : hasMixedCart
-        ? "Multi-Service"
-        : titleCase(state.activeDomain);
-  el.summaryFlow.textContent = isHistory ? `${state.orderHistory.length} Saved` : titleCase(state.flowState);
-  el.tabActive.classList.toggle("active", state.summaryView === "active");
-  el.tabHistory.classList.toggle("active", state.summaryView === "history");
-  el.secondaryMicrocopy.textContent = isRide ? "Ride booking" : "Checkout";
-  el.secondaryTitle.textContent = isRide ? "Booking sheet" : "Order sheet";
-  el.summaryItems.innerHTML = "";
-
-  if (isHistory) {
-    renderHistorySummary(state);
-    return;
-  }
-
-  if (isRide && (state.ride.destination || state.flowState === "ride booked")) {
-    el.summaryItems.innerHTML = `
-      <div class="summary-item">
-        <header>
-          <strong>${state.ride.agencyName || "Ride booking"}</strong>
-          <strong>${state.ride.destination || "-"}</strong>
-        </header>
-        <p>Vehicle: ${state.ride.vehicleMode ? titleCase(state.ride.vehicleMode) : "-"}</p>
-        <p>Type: ${state.ride.occupancy ? titleCase(state.ride.occupancy) : "-"}</p>
-        <p>Pickup: ${state.ride.pickupLocation || "-"}</p>
-        <p>Time: ${state.ride.pickupTime || "-"}</p>
-      </div>
-    `;
-  } else if (!state.cart.length) {
-    el.summaryItems.innerHTML = `<div class="empty-state"><strong>Nothing in progress</strong>Start a request and the live summary will appear here.</div>`;
-  } else {
-    renderActiveCart(state);
-  }
-
-  el.checkoutPanel.innerHTML = isRide ? buildRideCheckoutMarkup(state) : buildOrderCheckoutMarkup(state);
+  setMenuView(state.menuView);
+  renderProgress(state);
+  renderHistory(state);
+  renderFlow(state);
+  renderCart(state);
 }
 
-// History and active cart deliberately render through different paths to keep each state simple.
-function renderHistorySummary(state) {
+function renderProgress(state) {
+  const progress = getDraftProgress(state);
+  if (!el.progressFill) return;
+
+  el.progressFill.style.width = `${progress.percent}%`;
+  el.progressFill.classList.toggle("inactive", !progress.active);
+  if (el.flowStatusLabel) el.flowStatusLabel.textContent = progress.label;
+  if (el.flowStatusCopy) el.flowStatusCopy.textContent = progress.copy;
+}
+
+function renderHistory(state) {
+  if (!el.historyList) return;
+  el.historyList.innerHTML = "";
+
   if (!state.orderHistory.length) {
-    el.summaryItems.innerHTML = `<div class="empty-state"><strong>No past orders yet</strong>Completed orders will appear here after checkout.</div>`;
-  } else {
-    state.orderHistory.forEach((order) => {
-      const historyCard = document.createElement("article");
-      historyCard.className = `summary-item history-card${state.selectedHistoryOrderId === order.id ? " selected" : ""}`;
-      historyCard.dataset.orderId = order.id;
-      const serviceLabel = order.serviceDomains?.length
-        ? order.serviceDomains.map((domain) => titleCase(domain)).join(" + ")
-        : order.domain;
-      historyCard.innerHTML = `
-        <header>
-          <strong>${order.domain}</strong>
-          <strong>Rs. ${order.total}</strong>
-        </header>
-        <p>${order.items.length} item(s) | ${order.payment}</p>
-        <p>${serviceLabel}</p>
-        <p>${order.address}</p>
-      `;
-      el.summaryItems.appendChild(historyCard);
-    });
-  }
-
-  const selected = state.orderHistory.find((order) => order.id === state.selectedHistoryOrderId) || state.orderHistory[0];
-  if (selected && !state.selectedHistoryOrderId) {
-    state.selectedHistoryOrderId = selected.id;
-  }
-
-  if (!selected) {
-    el.checkoutPanel.innerHTML = `
-      <div class="checkout-box">
-        <header>
-          <strong>Order details</strong>
-          <strong>-</strong>
-        </header>
-        <p>Select a past order to view the full receipt.</p>
-      </div>
-    `;
+    el.historyList.innerHTML = `<div class="drawer-empty-state"><strong>No orders yet</strong>Your confirmed deliveries and rentals will appear here.</div>`;
     return;
   }
 
-  const groupedItems = selected.items.reduce((groups, item) => {
-    const key = item.domain || "other";
-    if (!groups[key]) groups[key] = [];
-    groups[key].push(item);
-    return groups;
-  }, {});
+  state.orderHistory.forEach((order) => {
+    const expanded = state.selectedHistoryOrderId === order.id;
+    const card = document.createElement("article");
+    card.className = `history-card${expanded ? " expanded" : ""}`;
+    card.dataset.orderId = order.id;
 
-  const groupedMarkup = Object.entries(groupedItems)
-    .map(([domain, items]) => `
-      <div class="history-detail-group">
-        <div class="summary-group-label">${titleCase(domain)} Items</div>
-        ${items.map((item) => `
-          <div class="history-detail-row">
-            <span>${item.name}</span>
-            <strong>${item.quantity} ${item.unit}</strong>
-          </div>
-        `).join("")}
-      </div>
-    `)
-    .join("");
-
-  const breakdownMarkup = selected.breakdown
-    ? Object.entries(selected.breakdown)
-      .map(([domain, info]) => `
+    const itemsMarkup = order.items
+      .map((item) => `
         <div class="history-detail-row">
-          <span>${titleCase(domain)}</span>
-          <strong>Rs. ${info.total}</strong>
+          <span>${item.name}</span>
+          <strong>${item.quantity} ${item.unit}</strong>
+        </div>
+        <div class="history-detail-row subtle">
+          <span>${getCartCategoryLabel(getCartCategory(item.domain || "grocery"))}</span>
+          <strong>${formatCurrency(item.lineTotal || item.price || 0)}</strong>
         </div>
       `)
-      .join("")
-    : "";
+      .join("");
 
-  el.checkoutPanel.innerHTML = `
-    <div class="checkout-box">
-      <header>
-        <strong>Selected order</strong>
-        <strong>Rs. ${selected.total}</strong>
-      </header>
-      <p>Status: Confirmed</p>
-      <p>Payment: ${selected.payment}</p>
-      <p>Address: ${selected.address}</p>
-      <p>Services: ${selected.serviceDomains?.length ? selected.serviceDomains.map((domain) => titleCase(domain)).join(" + ") : selected.domain}</p>
-    </div>
-    <div class="checkout-box">
-      <header>
-        <strong>Service split</strong>
-        <strong>${selected.serviceDomains?.length || 1} service(s)</strong>
-      </header>
-      ${breakdownMarkup}
-    </div>
-    <div class="checkout-box">
-      <header>
-        <strong>What you ordered</strong>
-        <strong>${selected.items.length} item(s)</strong>
-      </header>
-      ${groupedMarkup}
-    </div>
-  `;
-}
-
-function renderActiveCart(state) {
-  const groupedItems = state.cart.reduce((groups, item) => {
-    const key = item.domain || "other";
-    if (!groups[key]) groups[key] = [];
-    groups[key].push(item);
-    return groups;
-  }, {});
-
-  Object.entries(groupedItems).forEach(([domain, items]) => {
-    const section = document.createElement("section");
-    section.className = "summary-group";
-
-    const heading = document.createElement("div");
-    heading.className = "summary-group-label";
-    heading.textContent = `${titleCase(domain)} Items`;
-    section.appendChild(heading);
-
-    items.forEach((item) => {
-      const card = document.createElement("article");
-      card.className = "summary-item";
-      card.innerHTML = `
-        <header>
-          <strong>${item.name}</strong>
-          <strong>Rs. ${item.lineTotal}</strong>
-        </header>
-        <p>${item.quantity} ${item.unit} | ${item.meta}</p>
-        <div class="item-controls">
-          <button type="button" class="item-action" data-action="decrease" data-id="${item.id}">-</button>
-          <input class="item-qty-input" type="number" min="0.1" step="0.1" value="${item.quantity}" data-id="${item.id}">
-          <span class="item-unit-label">${item.unit}</span>
-          <button type="button" class="item-action" data-action="increase" data-id="${item.id}">+</button>
-          <button type="button" class="item-action delete" data-action="delete" data-id="${item.id}">Delete</button>
+    const breakdownMarkup = Object.entries(order.breakdown || {})
+      .map(([domain, info]) => `
+        <div class="history-detail-row">
+          <span>${getCartCategoryLabel(getCartCategory(domain))}</span>
+          <strong>${formatCurrency(info.total)}</strong>
         </div>
-      `;
-      section.appendChild(card);
-    });
+      `)
+      .join("");
 
-    el.summaryItems.appendChild(section);
+    const deliveryMarkup = Object.entries(order.deliveryDetails || {})
+      .map(([label, value]) => `
+        <div class="history-detail-row">
+          <span>${titleCase(label.replace(/([A-Z])/g, " $1").replace(/_/g, " "))}</span>
+          <strong>${value}</strong>
+        </div>
+      `)
+      .join("");
+
+    card.innerHTML = `
+      <button class="history-card-toggle" type="button" data-order-id="${order.id}">
+        <div class="history-card-top">
+          <div>
+            <p class="history-id">${order.id}</p>
+            <strong>${order.dateLabel}</strong>
+          </div>
+          <div class="history-card-meta">
+            <strong>${formatCurrency(order.total)}</strong>
+            <span>${order.status}</span>
+          </div>
+        </div>
+      </button>
+      <div class="history-card-body">
+        <div class="history-detail-group">
+          <div class="summary-group-label">Items ordered</div>
+          ${itemsMarkup}
+        </div>
+        <div class="history-detail-group">
+          <div class="summary-group-label">Price breakdown</div>
+          ${breakdownMarkup || `<div class="history-detail-row"><span>Total</span><strong>${formatCurrency(order.total)}</strong></div>`}
+        </div>
+        <div class="history-detail-group">
+          <div class="summary-group-label">Delivery details</div>
+          ${deliveryMarkup}
+        </div>
+      </div>
+    `;
+    el.historyList.appendChild(card);
   });
 }
 
-function buildRideCheckoutMarkup(state) {
-  return `
-    <div class="checkout-box">
-      <header>
-        <strong>Booking status</strong>
-        <strong>${titleCase(state.flowState)}</strong>
-      </header>
-      <p>Destination: ${state.ride.destination || "-"}</p>
-      <p>Agency: ${state.ride.agencyName || "-"}</p>
-      <p>Vehicle: ${state.ride.vehicleMode ? titleCase(state.ride.vehicleMode) : "-"}</p>
-      <p>Type: ${state.ride.occupancy ? titleCase(state.ride.occupancy) : "-"}</p>
-      <p>Pickup: ${state.ride.pickupLocation || "-"}</p>
-      <p>Pickup time: ${state.ride.pickupTime || "-"}</p>
-    </div>
-    <div class="checkout-box">
-      <header>
-        <strong>Ride contact</strong>
-        <strong>${state.ride.contactName || "-"}</strong>
-      </header>
-      <p>Driver: ${state.ride.contactName || "-"}</p>
-      <p>Phone: ${state.ride.contactPhone || "-"}</p>
-      <p>Session: ${state.sessionId}</p>
-    </div>
-  `;
+function renderFlow(state) {
+  if (!el.flowDetails) return;
+
+  const liveCart = getLiveCartSnapshot(state);
+
+  if (state.activeTracking) {
+    el.flowDetails.innerHTML = `
+      <div class="flow-stack">
+        <div class="flow-row">
+          <span>Tracking</span>
+          <strong>${state.activeTracking.status}</strong>
+        </div>
+        <div class="flow-row">
+          <span>Reference</span>
+          <strong>${state.activeTracking.orderId}</strong>
+        </div>
+        <div class="flow-row">
+          <span>Type</span>
+          <strong>${titleCase(state.activeTracking.kind)}</strong>
+        </div>
+      </div>
+    `;
+    return;
+  }
+
+  if (liveCart.itemCount) {
+    const categoryRows = liveCart.categories
+      .filter((group) => group.items.length)
+      .map((group) => `
+        <div class="flow-row">
+          <span>${group.label}</span>
+          <strong>${group.items.length} item(s)</strong>
+        </div>
+      `)
+      .join("");
+
+    el.flowDetails.innerHTML = `
+      <div class="flow-stack">
+        ${categoryRows}
+        <div class="flow-row">
+          <span>Combined total</span>
+          <strong>${formatCurrency(liveCart.total)}</strong>
+        </div>
+      </div>
+    `;
+    return;
+  }
+
+  el.flowDetails.innerHTML = `<div class="drawer-empty-state"><strong>No active flow</strong>Your current checkout or rental details will appear here.</div>`;
 }
 
-function buildOrderCheckoutMarkup(state) {
-  const cartDomains = [...new Set(state.cart.map((item) => item.domain).filter(Boolean))];
-  const serviceLabel = cartDomains.length > 1 ? cartDomains.map((domain) => titleCase(domain)).join(" + ") : (cartDomains[0] ? titleCase(cartDomains[0]) : "Order");
-  const groupedBreakdown = state.cart.reduce((groups, item) => {
-    const key = item.domain || "other";
-    if (!groups[key]) {
-      groups[key] = { subtotal: 0, itemCount: 0 };
-    }
-    groups[key].subtotal += item.lineTotal;
-    groups[key].itemCount += 1;
-    return groups;
-  }, {});
-  const breakdownMarkup = Object.entries(groupedBreakdown)
-    .map(([domain, info]) => `<p>${titleCase(domain)}: ${info.itemCount} item(s) • Rs. ${info.subtotal}</p>`)
-    .join("");
+function renderCart(state) {
+  const snapshot = getLiveCartSnapshot(state);
 
-  return `
-    <div class="checkout-box">
-      <header>
-        <strong>Total payable</strong>
-        <strong>Rs. ${state.totals.total}</strong>
-      </header>
-      <p>Services: ${serviceLabel}</p>
-      ${breakdownMarkup}
-      <p>Subtotal: Rs. ${state.totals.subtotal}</p>
-      <p>Delivery: Rs. ${state.totals.delivery}</p>
-      <p>Tax: Rs. ${state.totals.tax}</p>
-    </div>
-    <div class="checkout-box">
-      <header>
-        <strong>Address</strong>
-        <strong>${state.address}</strong>
-      </header>
-      <p>Payment mode: ${state.paymentChoice ? titleCase(state.paymentChoice.replace("_", " ")) : "-"}</p>
-      <p>Payment: ${titleCase(state.paymentStatus)}</p>
-      <p>Session: ${state.sessionId}</p>
-    </div>
-  `;
+  if (el.cartBadge) {
+    el.cartBadge.textContent = String(snapshot.itemCount);
+    el.cartBadge.classList.toggle("has-items", snapshot.itemCount > 0);
+  }
+
+  if (el.cartGroups) {
+    el.cartGroups.innerHTML = "";
+
+    if (!snapshot.itemCount) {
+      el.cartGroups.innerHTML = `<div class="drawer-empty-state"><strong>Cart is empty</strong>Ask eBee for food, groceries, fruits, or a rental to start building it.</div>`;
+    } else {
+      snapshot.categories.forEach((group) => {
+        if (!group.items.length) return;
+        const section = document.createElement("section");
+        section.className = "cart-group";
+        section.innerHTML = `<div class="cart-group-title">${group.label}</div>`;
+
+        group.items.forEach((item) => {
+          const article = document.createElement("article");
+          article.className = "cart-item-card";
+          article.innerHTML = `
+            <div class="cart-item-top">
+              <div>
+                <strong>${item.name}</strong>
+                <p>${item.meta}</p>
+              </div>
+              <strong>${formatCurrency(item.lineTotal)}</strong>
+            </div>
+            ${item.editable ? `
+              <div class="item-controls">
+                <button type="button" class="item-action" data-action="decrease" data-id="${item.id}">-</button>
+                <input class="item-qty-input" type="number" min="${getQuantityStep(item.unit)}" step="${getQuantityStep(item.unit)}" value="${item.quantity}" data-id="${item.id}">
+                <span class="item-unit-label">${item.unit}</span>
+                <button type="button" class="item-action" data-action="increase" data-id="${item.id}">+</button>
+              </div>
+            ` : `
+              <div class="cart-item-fixed">
+                <span>Quantity</span>
+                <strong>${item.quantity} ${item.unit}</strong>
+              </div>
+            `}
+          `;
+          section.appendChild(article);
+        });
+
+        el.cartGroups.appendChild(section);
+      });
+    }
+  }
+
+  if (el.cartSubtotal) el.cartSubtotal.textContent = formatCurrency(snapshot.subtotal);
+  if (el.cartFees) el.cartFees.textContent = formatCurrency(snapshot.fees);
+  if (el.cartTotal) el.cartTotal.textContent = formatCurrency(snapshot.total);
+  if (el.cartFooterCopy) {
+    el.cartFooterCopy.textContent = snapshot.itemCount
+      ? `${snapshot.itemCount} item(s) across ${snapshot.activeCategoryCount} active category${snapshot.activeCategoryCount === 1 ? "" : "ies"}.`
+      : "Your grouped live cart will appear here.";
+  }
+}
+
+function getLiveCartSnapshot(state) {
+  const groups = [
+    { key: "food", label: "Food", items: [] },
+    { key: "groceries", label: "Groceries", items: [] },
+    { key: "rental", label: "Rental", items: [] },
+  ];
+
+  const groupMap = Object.fromEntries(groups.map((group) => [group.key, group]));
+
+  state.cart.forEach((item) => {
+    const category = getCartCategory(item.domain);
+    groupMap[category].items.push({
+      ...item,
+      editable: true,
+    });
+  });
+
+  const rideItem = buildRideCartItem(state);
+  if (rideItem) {
+    groupMap.rental.items.push(rideItem);
+  }
+
+  const rideTotal = rideItem ? rideItem.lineTotal : 0;
+  const rideFees = rideItem ? Math.max(0, rideItem.lineTotal - rideItem.price) : 0;
+  const subtotal = state.totals.subtotal + (rideItem ? rideItem.price : 0);
+  const fees = (state.totals.total - state.totals.subtotal) + rideFees;
+  const total = state.totals.total + rideTotal;
+  const itemCount = groups.reduce((count, group) => count + group.items.length, 0);
+  const activeCategoryCount = groups.filter((group) => group.items.length).length;
+
+  return {
+    categories: groups,
+    subtotal,
+    fees,
+    total,
+    itemCount,
+    activeCategoryCount,
+  };
+}
+
+function buildRideCartItem(state) {
+  const hasDraftRide = Boolean(state.ride.destination && state.ride.vehicleMode && state.ride.occupancy);
+  const hasActiveRental = state.activeTracking?.kind === "rental" && state.activeTracking.status !== "Trip completed";
+
+  if (!hasDraftRide && !hasActiveRental) return null;
+
+  const pricing = estimateRidePricing(state.ride);
+  return {
+    id: "ride-booking",
+    domain: "ride",
+    name: `${titleCase(state.ride.vehicleMode || "Ride")} to ${state.ride.destination || "Destination pending"}`,
+    quantity: 1,
+    unit: "trip",
+    price: pricing.subtotal,
+    lineTotal: pricing.total,
+    meta: `${titleCase(state.ride.occupancy || "reserved")} • ${state.ride.pickupLocation || "Pickup pending"}`,
+    editable: false,
+  };
 }

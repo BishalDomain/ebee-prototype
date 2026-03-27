@@ -237,6 +237,107 @@ export function titleCase(value) {
   return value.replace(/\b\w/g, (char) => char.toUpperCase());
 }
 
+export function formatCurrency(value) {
+  const amount = Number(value || 0);
+  return `Rs. ${Number.isInteger(amount) ? amount : amount.toFixed(2)}`;
+}
+
+export function getCartCategory(domain) {
+  if (domain === "food") return "food";
+  if (domain === "ride") return "rental";
+  return "groceries";
+}
+
+export function getCartCategoryLabel(category) {
+  const labels = {
+    food: "Food",
+    groceries: "Groceries",
+    rental: "Rental",
+  };
+  return labels[category] || titleCase(category);
+}
+
+export function estimateRidePricing(ride) {
+  const matrix = {
+    car: { reserved: 820, shared: 460 },
+    bike: { reserved: 180 },
+    cab: { reserved: 620, shared: 360 },
+  };
+
+  const subtotal = matrix[ride.vehicleMode]?.[ride.occupancy || "reserved"] || 0;
+  const tax = Math.round(subtotal * 0.05);
+  const total = subtotal + tax;
+
+  return {
+    subtotal,
+    tax,
+    total,
+  };
+}
+
+export function getDraftProgress(state) {
+  if (state.activeTracking) {
+    return {
+      label: state.activeTracking.status,
+      copy: state.activeTracking.copy,
+      percent: state.activeTracking.percent,
+      active: true,
+    };
+  }
+
+  if (state.ride.step || state.flowState === "ride booked" || state.ride.destination) {
+    const rideStages = {
+      destination: { percent: 18, label: "Destination", copy: "Choose where you want to go." },
+      mode: { percent: 34, label: "Vehicle", copy: "Select car, bike, or cab." },
+      occupancy: { percent: 48, label: "Ride type", copy: "Choose shared or reserved." },
+      pickup: { percent: 66, label: "Pickup", copy: "Add your pickup location." },
+      time: { percent: 80, label: "Pickup time", copy: "Set the ride timing." },
+      confirm: { percent: 92, label: "Confirmation", copy: "Confirm the booking details." },
+    };
+
+    if (state.flowState === "ride booked") {
+      return {
+        label: "Ride booked",
+        copy: "Your rental is confirmed and being tracked.",
+        percent: 100,
+        active: true,
+      };
+    }
+
+    return rideStages[state.ride.step] || {
+      label: "Ride in progress",
+      copy: "Continue the rental flow.",
+      percent: 28,
+      active: true,
+    };
+  }
+
+  if (state.cart.length) {
+    const flowMap = {
+      "collecting request": { percent: 22, label: "Building cart", copy: "Tell eBee what you want to add." },
+      "waiting for item details": { percent: 28, label: "Need item details", copy: "Refine the items or quantities." },
+      "cart updated": { percent: 42, label: "Cart updated", copy: "Your live cart is ready to review." },
+      "checkout ready": { percent: 62, label: "Checkout ready", copy: "Choose how you want to pay." },
+      "payment mode selected": { percent: 78, label: "Payment selected", copy: "Confirm the payment to place the order." },
+      "order confirmed": { percent: 100, label: "Order placed", copy: "Your latest order was confirmed." },
+    };
+
+    return flowMap[state.flowState] || {
+      label: "Active cart",
+      copy: "Your order is still in progress.",
+      percent: 34,
+      active: true,
+    };
+  }
+
+  return {
+    label: "Ready",
+    copy: "Start a new conversation to create an order.",
+    percent: 0,
+    active: false,
+  };
+}
+
 export function delay(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }

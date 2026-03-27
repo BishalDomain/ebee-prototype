@@ -9,103 +9,198 @@
   <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Sora:wght@600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="./styles.css">
 </head>
-<body>
+<body class="chat-first-app">
   <div class="ambient ambient-one"></div>
   <div class="ambient ambient-two"></div>
+  <div id="drawer-overlay" class="drawer-overlay" aria-hidden="true"></div>
+
+  <aside id="menu-drawer" class="drawer drawer-left" aria-hidden="true">
+    <div class="drawer-shell">
+      <div class="drawer-header">
+        <img class="drawer-logo" src="./logo.png" alt="eBee logo">
+        <button id="close-menu" class="icon-button drawer-close" type="button" aria-label="Close menu">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M6 6L18 18M18 6L6 18" fill="none" stroke="currentColor" stroke-linecap="round" stroke-width="2"></path>
+          </svg>
+        </button>
+      </div>
+
+      <div class="drawer-primary-actions">
+        <button id="reset-session" class="drawer-pill-button" type="button">New chat</button>
+      </div>
+
+      <div class="drawer-tabs" role="tablist" aria-label="Menu sections">
+        <button id="history-view-btn" class="drawer-tab active" type="button" role="tab" aria-selected="true">Order history</button>
+        <button id="flow-view-btn" class="drawer-tab" type="button" role="tab" aria-selected="false">Order flow</button>
+      </div>
+
+      <section id="history-panel" class="drawer-panel active" role="tabpanel">
+        <div id="history-list" class="history-list"></div>
+      </section>
+
+      <section id="flow-panel" class="drawer-panel" role="tabpanel" hidden>
+        <article class="drawer-card">
+          <div class="drawer-card-head">
+            <p class="drawer-label">Status</p>
+            <strong id="flow-status-label">Ready</strong>
+          </div>
+          <p id="flow-status-copy" class="drawer-copy">Start a conversation to create an order flow.</p>
+        </article>
+
+        <article class="drawer-card">
+          <div class="drawer-card-head">
+            <p class="drawer-label">Quick actions</p>
+          </div>
+          <div class="prompt-bar prompt-bar-sidebar">
+            <span>Try: "1 kg rice, 2 litre cooking oil"</span>
+            <span>Try: "I need a rental ride to Bhubaneswar"</span>
+          </div>
+          <div id="suggestions" class="suggestions suggestions-drawer"></div>
+        </article>
+
+        <article class="drawer-card">
+          <div class="drawer-card-head">
+            <p class="drawer-label">Current details</p>
+          </div>
+          <div id="flow-details" class="flow-details"></div>
+        </article>
+      </section>
+    </div>
+  </aside>
+
+  <aside id="cart-drawer" class="drawer drawer-right" aria-hidden="true">
+    <div class="drawer-shell">
+      <div class="drawer-header">
+        <div class="drawer-cart-title">
+          <div class="drawer-cart-icon" aria-hidden="true">
+            <svg width="220" height="220" viewBox="0 0 220 220" xmlns="http://www.w3.org/2000/svg">
+              <defs>
+                <linearGradient id="gradStrokeDrawer" x1="0" y1="0" x2="220" y2="220" gradientUnits="userSpaceOnUse">
+                  <stop offset="0%" stop-color="#4facfe"></stop>
+                  <stop offset="50%" stop-color="#d600ff"></stop>
+                  <stop offset="100%" stop-color="#ff7a5c"></stop>
+                </linearGradient>
+              </defs>
+              <g transform="translate(0,220) scale(1,-1)">
+                <path d="M45 35 H175 C195 35 195 55 195 55 L185 155 C180 185 150 185 150 185 H70 C40 185 35 155 35 155 L25 55 C25 55 25 35 45 35 Z" fill="none" stroke="url(#gradStrokeDrawer)" stroke-width="16" stroke-linecap="round" stroke-linejoin="round"></path>
+              </g>
+              <g transform="translate(0,180) scale(1,-1)">
+                <path d="M80 90 Q110 60 140 90" fill="none" stroke="url(#gradStrokeDrawer)" stroke-width="16" stroke-linecap="round"></path>
+              </g>
+            </svg>
+          </div>
+          <div>
+            <p class="drawer-label">Live cart</p>
+            <h2>Cart</h2>
+          </div>
+        </div>
+        <button id="close-cart" class="icon-button drawer-close" type="button" aria-label="Close cart">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M6 6L18 18M18 6L6 18" fill="none" stroke="currentColor" stroke-linecap="round" stroke-width="2"></path>
+          </svg>
+        </button>
+      </div>
+
+      <div id="cart-groups" class="cart-groups"></div>
+
+      <div class="cart-footer">
+        <div class="cart-total-card">
+          <div class="cart-total-row">
+            <span>Subtotal</span>
+            <strong id="cart-subtotal">Rs. 0</strong>
+          </div>
+          <div class="cart-total-row">
+            <span>Tax + fees</span>
+            <strong id="cart-fees">Rs. 0</strong>
+          </div>
+          <div class="cart-total-row total">
+            <span>Total</span>
+            <strong id="cart-total">Rs. 0</strong>
+          </div>
+          <p id="cart-footer-copy" class="cart-footer-copy">Your grouped live cart will appear here.</p>
+        </div>
+      </div>
+    </div>
+  </aside>
 
   <main class="app">
     <section class="shell">
-      <header class="topbar">
-        <div class="brand">
-          <div class="brand-mark">
-            <img src="./logo.png" alt="eBee logo">
-          </div>
-          <div>
-            <p class="microcopy">Conversational commerce</p>
-            <h1>eBee</h1>
-          </div>
+      <header class="fixed-header">
+        <button id="menu-toggle" class="header-icon-button gradient-icon-button" type="button" aria-label="Open menu" aria-controls="menu-drawer" aria-expanded="false">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M4 7H20M4 12H20M4 17H15" fill="none" stroke="currentColor" stroke-linecap="round" stroke-width="2"></path>
+          </svg>
+        </button>
+
+        <div class="header-logo-wrap">
+          <img class="header-logo" src="./logo.png" alt="eBee logo">
         </div>
 
-        <div class="topbar-actions">
-          <span class="topbar-note">Odisha beta</span>
-          <button id="reset-session" class="secondary-button" type="button">New chat</button>
+        <div class="header-actions">
+          <button id="cart-toggle" class="header-icon-button cart-toggle" type="button" aria-label="Open cart" aria-controls="cart-drawer" aria-expanded="false">
+            <svg width="220" height="220" viewBox="0 0 220 220" xmlns="http://www.w3.org/2000/svg">
+              <defs>
+                <linearGradient id="gradStrokeHeader" x1="0" y1="0" x2="220" y2="220" gradientUnits="userSpaceOnUse">
+                  <stop offset="0%" stop-color="#4facfe"></stop>
+                  <stop offset="50%" stop-color="#d600ff"></stop>
+                  <stop offset="100%" stop-color="#ff7a5c"></stop>
+                </linearGradient>
+              </defs>
+              <g transform="translate(0,220) scale(1,-1)">
+                <path d="M45 35 H175 C195 35 195 55 195 55 L185 155 C180 185 150 185 150 185 H70 C40 185 35 155 35 155 L25 55 C25 55 25 35 45 35 Z" fill="none" stroke="url(#gradStrokeHeader)" stroke-width="16" stroke-linecap="round" stroke-linejoin="round"></path>
+              </g>
+              <g transform="translate(0,180) scale(1,-1)">
+                <path d="M80 90 Q110 60 140 90" fill="none" stroke="url(#gradStrokeHeader)" stroke-width="16" stroke-linecap="round"></path>
+              </g>
+            </svg>
+            <span id="cart-badge" class="cart-badge">0</span>
+          </button>
+
+          <div class="header-profile-chip gradient-icon-button" aria-hidden="true">
+            <svg viewBox="0 0 24 24">
+              <path d="M12 12C14.21 12 16 10.21 16 8C16 5.79 14.21 4 12 4C9.79 4 8 5.79 8 8C8 10.21 9.79 12 12 12Z" fill="none" stroke="currentColor" stroke-width="2"></path>
+              <path d="M5 20C5.8 16.92 8.46 15 12 15C15.54 15 18.2 16.92 19 20" fill="none" stroke="currentColor" stroke-linecap="round" stroke-width="2"></path>
+            </svg>
+          </div>
         </div>
       </header>
-
-      <section class="hero">
-        <div>
-          <p class="microcopy">Assistive commerce for Odisha</p>
-          <h2>One message in. Smart follow-up out.</h2>
-          <p class="hero-copy">Order essentials, request food, send fruits, or book a rental ride through one calm conversational interface.</p>
+      <div class="order-progress-block" aria-label="Order progress">
+        <div class="order-progress-track">
+          <div id="order-progress-fill" class="order-progress-fill"></div>
         </div>
-
-        <div class="hero-pills">
-          <span>Chat-first</span>
-          <span>Odisha-local</span>
-          <span>Guided flow</span>
-        </div>
-      </section>
+      </div>
 
       <section class="workspace">
-        <section class="chat-stage">
-          <div class="chat-stage-head">
-            <div>
-              <p class="microcopy">Conversation</p>
-              <h3>Customer assistant</h3>
-            </div>
-
-            <div class="presence">
-              <span class="presence-dot"></span>
-              <span id="assistant-status">Online</span>
-            </div>
-          </div>
-
-          <div class="prompt-bar">
-            <span>Try: "1 kg rice, 2 litre cooking oil"</span>
-            <span>or "I need a rental ride to Bhubaneswar"</span>
-          </div>
-
+        <section class="chat-stage chat-stage-minimal">
           <div id="chat-log" class="chat-log" aria-live="polite"></div>
-          <div id="suggestions" class="suggestions"></div>
 
           <form id="chat-form" class="composer">
             <label class="sr-only" for="user-input">Message eBee</label>
-            <div class="composer-field">
+            <button id="upload-trigger" class="composer-side-button gradient-icon-button" type="button" aria-label="Upload menu image">
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M12 16V7M12 7L8.5 10.5M12 7L15.5 10.5M5 17.5V18C5 19.1 5.9 20 7 20H17C18.1 20 19 19.1 19 18V17.5" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path>
+              </svg>
+            </button>
+
+            <div class="composer-field modern-composer-field">
               <input id="user-input" name="message" type="text" autocomplete="off" placeholder="Message eBee">
+              <button id="send-inline" class="inline-send-button" type="submit" aria-label="Send message">
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M4.5 11.5L19 5L13.5 19L10.8 13.9L4.5 11.5Z" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path>
+                </svg>
+              </button>
             </div>
-            <button class="primary-button" type="submit">Send</button>
+
+            <button id="voice-trigger" class="composer-side-button gradient-icon-button" type="button" aria-label="Start voice input">
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M12 4C10.34 4 9 5.34 9 7V11C9 12.66 10.34 14 12 14C13.66 14 15 12.66 15 11V7C15 5.34 13.66 4 12 4Z" fill="none" stroke="currentColor" stroke-width="2"></path>
+                <path d="M6.5 11C6.5 14.04 8.96 16.5 12 16.5C15.04 16.5 17.5 14.04 17.5 11" fill="none" stroke="currentColor" stroke-linecap="round" stroke-width="2"></path>
+                <path d="M12 16.5V20M9 20H15" fill="none" stroke="currentColor" stroke-linecap="round" stroke-width="2"></path>
+              </svg>
+            </button>
+            <input id="menu-image-input" type="file" accept="image/*" hidden>
           </form>
         </section>
-
-        <aside class="summary-stage">
-          <section class="summary-card">
-            <div class="summary-head">
-              <div>
-                <p class="microcopy">Live summary</p>
-                <h3 id="summary-domain">Nothing started yet</h3>
-              </div>
-              <span id="summary-flow" class="status-pill">Ready</span>
-            </div>
-
-            <div class="summary-tabs">
-              <button id="tab-active" class="summary-tab active" type="button">Active Cart</button>
-              <button id="tab-history" class="summary-tab" type="button">Order History</button>
-            </div>
-
-            <div id="summary-items" class="summary-items"></div>
-          </section>
-
-          <section class="summary-card">
-            <div class="summary-head">
-              <div>
-                <p id="secondary-microcopy" class="microcopy">Checkout</p>
-                <h3 id="secondary-title">Order sheet</h3>
-              </div>
-            </div>
-
-            <div id="checkout-panel" class="checkout-panel"></div>
-          </section>
-        </aside>
       </section>
     </section>
   </main>

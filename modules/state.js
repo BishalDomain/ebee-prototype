@@ -26,13 +26,14 @@ export const state = {
   sessionId: `ebee-${Math.random().toString(36).slice(2, 8)}`,
   activeDomain: "general",
   flowState: "ready",
+  activeTracking: null,
   paymentStatus: "not started",
   paymentChoice: "",
   address: "Not set",
   cart: [],
   orderHistory: [],
   selectedHistoryOrderId: null,
-  summaryView: "active",
+  menuView: "history",
   recipePlan: null,
   totals: createInitialTotals(),
   ride: createInitialRideState(),
@@ -41,12 +42,13 @@ export const state = {
 export function resetSessionState() {
   state.activeDomain = "general";
   state.flowState = "ready";
+  state.activeTracking = null;
   state.paymentStatus = "not started";
   state.paymentChoice = "";
   state.address = "Not set";
   state.cart = [];
   state.selectedHistoryOrderId = null;
-  state.summaryView = "active";
+  state.menuView = "history";
   state.recipePlan = null;
   state.totals = createInitialTotals();
   state.ride = createInitialRideState();
